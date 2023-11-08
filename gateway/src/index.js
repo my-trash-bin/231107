@@ -1,6 +1,6 @@
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
-import { ApolloGateway } from '@apollo/gateway';
+import { ApolloGateway, IntrospectAndCompose } from '@apollo/gateway';
 import FileUploadDataSource from '@profusion/apollo-federation-upload';
 import cors from 'cors';
 import express from 'express';
@@ -24,9 +24,12 @@ const runServer = async () => {
             }) };
         }
       }),
-      serviceList: [
-        { name: "user", url: "http://localhost:4001/graphql" },
-      ],
+      supergraphSdl: new IntrospectAndCompose({
+        subgraphs: [
+          { name: "user", url: "http://localhost:4001/graphql" },
+          { name: "post", url: "http://localhost:4002/graphql" },
+        ]
+      }),
     }),
     context: ({ req }) => {
       const user = req.auth || null;

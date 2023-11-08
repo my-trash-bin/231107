@@ -7,38 +7,48 @@ import express from 'express';
 import graphqlUploadExpress from 'graphql-upload/graphqlUploadExpress.mjs';
 import gql from 'graphql-tag';
 
-const users = [
-  { id: 'admin', name: 'admin' },
-  { id: 'user', name: 'user' },
+const posts = [
+  { id: '1', authorId: 'admin', content: 'hello' },
+  { id: '2', authorId: 'user', content: 'world' },
 ];
 
 const typeDefs = gql`
   scalar Upload
-  type User @key(fields: "id") {
+  type Post @key(fields: "id") {
     id: ID!
-    name: String!
+    content: String!
+    author: User!
+  }
+  extend type User @key(fields: "id") {
+    id: ID! @external
+    posts: [Post!]!
   }
   extend type Query {
-    user(id: ID!): User
-    users: [User!]!
-  }
-  extend type Mutation {
-    fileSize(file: Upload!): Int!
+    post(id: ID!): Post
+    posts: [Post!]!
   }
 `;
 
 const resolvers = {
   User: {
+    posts(parent) {
+      return posts.filter(post => post.authorId === parent.id);
+    }
+  },
+  Post: {
     __resolveReference(object) {
-      return users.find(user => user.id === object.id);
+      return posts.find(post => post.id === object.id);
+    },
+    author(parent) {
+      return { __typename: 'User', id: parent.authorId };
     }
   },
   Query: {
-    user(_parent, { id }) {
-      return users.find(user => user.id === id);
+    post(_parent, { id }) {
+      return posts.find(post => post.id === id);
     },
-    users() {
-      return users;
+    posts() {
+      return posts;
     },
   },
   Mutation: {
@@ -64,7 +74,7 @@ const resolvers = {
 const schema = buildSubgraphSchema({ typeDefs, resolvers });
 
 const runServer = async () => {
-  const port = 4001;
+  const port = 4002;
   const app = express();
 
   const server = new ApolloServer({
