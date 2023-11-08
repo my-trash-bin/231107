@@ -6,10 +6,11 @@ import cors from 'cors';
 import express from 'express';
 import graphqlUploadExpress from 'graphql-upload/graphqlUploadExpress.mjs';
 import gql from 'graphql-tag';
+import jwt from 'jsonwebtoken';
 
 const users = [
-  { id: 'admin', name: 'admin' },
-  { id: 'user', name: 'user' },
+  { id: 'admin', name: 'admin', password: 'admin' },
+  { id: 'user', name: 'user', password: 'user' },
 ];
 
 const typeDefs = gql`
@@ -24,6 +25,7 @@ const typeDefs = gql`
   }
   extend type Mutation {
     fileSize(file: Upload!): Int!
+    login(id: String!, password: String!): String
   }
 `;
 
@@ -46,7 +48,7 @@ const resolvers = {
       return (async () => {
         let file = await promise;
         if (file.promise)
-        file = await file.promise;
+          file = await file.promise;
         let size = 0;
         await new Promise((resolve) => {
           let readStream = file.createReadStream();
@@ -57,7 +59,13 @@ const resolvers = {
         });
         return size;
       })();
-    }
+    },
+    login(_parent, { id, password }) {
+      if (users.find(user => user.id === id)?.password === password) {
+        return jwt.sign({ ft: { id } }, "f1BtnWgD3VKY", { expiresIn: '1d', algorithm: "HS256" });
+      }
+      return null;
+    },
   },
 };
 
@@ -69,10 +77,6 @@ const runServer = async () => {
 
   const server = new ApolloServer({
     schema,
-    context: ({ req }) => {
-      const user = req.headers.user ? JSON.parse(req.headers.user) : null;
-      return { user };
-    },
     plugins: [ApolloServerPluginLandingPageLocalDefault({ footer: false })],
   });
 
@@ -83,7 +87,12 @@ const runServer = async () => {
     cors(),
     express.json(),
     graphqlUploadExpress(),
-    expressMiddleware(server)
+    expressMiddleware(server, {
+      context: ({ req }) => {
+        const user = req.headers.user ? JSON.parse(req.headers.user) : null;
+        return { user };
+      },
+    })
   );
 
   app.listen({ port }, () =>

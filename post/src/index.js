@@ -26,6 +26,7 @@ const typeDefs = gql`
   extend type Query {
     post(id: ID!): Post
     posts: [Post!]!
+    myPosts: [Post!]
   }
 `;
 
@@ -50,6 +51,11 @@ const resolvers = {
     posts() {
       return posts;
     },
+    myPosts(_parent, _args, context) {
+      if (!context.user)
+        return null;
+      return posts.filter(post => post.authorId === context.user.id);
+    }
   },
   Mutation: {
     fileSize(_parent, { file: { promise } }) {
@@ -79,10 +85,6 @@ const runServer = async () => {
 
   const server = new ApolloServer({
     schema,
-    context: ({ req }) => {
-      const user = req.headers.user ? JSON.parse(req.headers.user) : null;
-      return { user };
-    },
     plugins: [ApolloServerPluginLandingPageLocalDefault({ footer: false })],
   });
 
@@ -93,7 +95,12 @@ const runServer = async () => {
     cors(),
     express.json(),
     graphqlUploadExpress(),
-    expressMiddleware(server)
+    expressMiddleware(server, {
+      context: ({ req }) => {
+        const user = req.headers.user ? JSON.parse(req.headers.user) : null;
+        return { user };
+      },
+    })
   );
 
   app.listen({ port }, () =>

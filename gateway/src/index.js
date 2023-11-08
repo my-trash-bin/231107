@@ -17,11 +17,15 @@ const runServer = async () => {
         url,
         useChunkedTransfer: true,
         willSendRequest({ request, context }) {
-          if (!request.http)
+          if (!request.http) {
             request.http = { headers: Object.entries({
-              user: context.user ? JSON.stringify(context.user) : undefined,
+              ...(context.user && { user: JSON.stringify(context.user) }),
               'apollo-require-preflight': 'Hello world!',
             }) };
+          } else {
+            if (context.user)
+              request.http.headers.append('user', JSON.stringify(context.user));
+          }
         }
       }),
       supergraphSdl: new IntrospectAndCompose({
@@ -31,10 +35,6 @@ const runServer = async () => {
         ]
       }),
     }),
-    context: ({ req }) => {
-      const user = req.auth || null;
-      return { user };
-    }
   });
 
   await server.start();
@@ -49,7 +49,12 @@ const runServer = async () => {
       credentialsRequired: false
     }),
     graphqlUploadExpress(),
-    expressMiddleware(server)
+    expressMiddleware(server, {
+      context: ({ req }) => {
+        const user = req.auth?.ft || null;
+        return { user };
+      },
+    })
   );
 
   app.listen({ port }, () =>
